@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +35,7 @@ fun TopScannerBar(
         // ── Back button ────────────────────────────────────────────────────
         RoundIconButton(onClick = onBack) {
             Icon(
-                imageVector        = Icons.Rounded.ArrowBack,
+                imageVector        = Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = "Back",
                 tint               = Color.White,
                 modifier           = Modifier.size(20.dp),

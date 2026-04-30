@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import com.vanniktech.maven.publish.SonatypeHost
+import org.gradle.plugins.signing.SigningExtension
 import java.util.Properties
 
 plugins {
@@ -6,7 +8,7 @@ plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    id("maven-publish")
+    id("com.vanniktech.maven.publish") version "0.29.0"
 }
 
 // ─────────────────────────────────────────
@@ -26,11 +28,9 @@ fun localOrProject(key: String): String? =
 // ─────────────────────────────────────────
 // Library Info
 // ─────────────────────────────────────────
-val libraryGroup: String    = localOrProject("LIBRARY_GROUP")!!
-val libraryArtifact: String = localOrProject("LIBRARY_ARTIFACT")!!
-val libraryVersion: String  = localOrProject("LIBRARY_VERSION")!!
-
-// Library POM Info
+val libraryGroup: String         = localOrProject("LIBRARY_GROUP")!!
+val libraryArtifact: String      = localOrProject("LIBRARY_ARTIFACT")!!
+val libraryVersion: String       = localOrProject("LIBRARY_VERSION")!!
 val libraryName: String          = localOrProject("LIBRARY_NAME")!!
 val libraryDescription: String   = localOrProject("LIBRARY_DESCRIPTION")!!
 val libraryUrl: String           = localOrProject("LIBRARY_URL")!!
@@ -42,7 +42,9 @@ val libraryScmDevConn: String    = localOrProject("LIBRARY_SCM_DEV_CONNECTION")!
 val libraryDevId: String         = localOrProject("LIBRARY_DEVELOPER_ID")!!
 val libraryDevName: String       = localOrProject("LIBRARY_DEVELOPER_NAME")!!
 
-// GitHub Credentials
+// ─────────────────────────────────────────
+// Credentials
+// ─────────────────────────────────────────
 val githubUser: String?  = localOrProject("GITHUB_USER")
 val githubToken: String? = localOrProject("GITHUB_TOKEN")
 
@@ -62,12 +64,44 @@ configurations.all {
     )
 }
 
+// ─────────────────────────────────────────
+// Android — MUST be before kotlin{}
+// ─────────────────────────────────────────
+android {
+    namespace  = "org.qrcode.scanner"
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+    defaultConfig {
+        minSdk    = libs.versions.android.minSdk.get().toInt()
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+// ─────────────────────────────────────────
+// Kotlin Multiplatform
+// ─────────────────────────────────────────
 kotlin {
     androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
-        publishLibraryVariants("release")
     }
 
     iosArm64()
@@ -117,10 +151,11 @@ kotlin {
 }
 
 // ─────────────────────────────────────────
-// Publishing
+// GitHub Packages
 // ─────────────────────────────────────────
 publishing {
     repositories {
+        mavenLocal()
         maven {
             name = "GitHubPackages"
             url  = uri("https://maven.pkg.github.com/karun02525/QRCodeScannerLibrary")
@@ -132,71 +167,62 @@ publishing {
     }
 }
 
-afterEvaluate {
-    publishing.publications.withType<MavenPublication>().forEach { pub ->
+// ─────────────────────────────────────────
+// Maven Central — Vanniktech
+// ─────────────────────────────────────────
+mavenPublishing {
+    publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
 
-        pub.groupId = libraryGroup
-        pub.version = libraryVersion
-        pub.artifactId = when (pub.name) {
-            "kotlinMultiplatform" -> libraryArtifact
-            "androidRelease"      -> "$libraryArtifact-android"
-            "iosArm64"            -> "$libraryArtifact-iosarm64"
-            "iosSimulatorArm64"   -> "$libraryArtifact-iossimulatorarm64"
-            else                  -> "$libraryArtifact-${pub.name.lowercase()}"
+    coordinates(
+        groupId    = libraryGroup,
+        artifactId = libraryArtifact,
+        version    = libraryVersion
+    )
+
+    pom {
+        name.set(libraryName)
+        description.set(libraryDescription)
+        url.set(libraryUrl)
+
+        licenses {
+            license {
+                name.set(libraryLicenseName)
+                url.set(libraryLicenseUrl)
+            }
         }
 
-        pub.pom {
-            name.set(libraryName)
-            description.set(libraryDescription)
-            url.set(libraryUrl)
-            licenses {
-                license {
-                    name.set(libraryLicenseName)
-                    url.set(libraryLicenseUrl)
-                }
+        developers {
+            developer {
+                id.set(libraryDevId)
+                name.set(libraryDevName)
             }
-            developers {
-                developer {
-                    id.set(libraryDevId)
-                    name.set(libraryDevName)
-                }
-            }
-            scm {
-                url.set(libraryScmUrl)
-                connection.set(libraryScmConnection)
-                developerConnection.set(libraryScmDevConn)
-            }
+        }
+
+        scm {
+            url.set(libraryScmUrl)
+            connection.set(libraryScmConnection)
+            developerConnection.set(libraryScmDevConn)
         }
     }
 }
 
 // ─────────────────────────────────────────
-// Android
+// ✅ Explicit Signing — reads directly from local.properties
+// Overrides vanniktech's property lookup (which was failing)
 // ─────────────────────────────────────────
-android {
-    namespace  = "org.qrcode.scanner"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+afterEvaluate {
+    extensions.configure<SigningExtension> {
+        val key      = localOrProject("SIGNING_KEY")
+        val password = localOrProject("SIGNING_PASSWORD")
 
-    defaultConfig {
-        minSdk    = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        if (!key.isNullOrBlank() && !password.isNullOrBlank()) {
+            useInMemoryPgpKeys(key, password)
+            sign(publishing.publications)
+            logger.lifecycle("✅ Signing configured successfully")
+        } else {
+            logger.warn("⚠️ SIGNING_KEY or SIGNING_PASSWORD missing in local.properties")
         }
-    }
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
