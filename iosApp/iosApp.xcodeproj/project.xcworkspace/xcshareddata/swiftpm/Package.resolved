@@ -1,0 +1,15 @@
+{
+  "originHash" : "6ba0521b4a2f13b36f6c29e950136eb4f860be67ae19b32f9ed69145caa1fa91",
+  "pins" : [
+    {
+      "identity" : "qrscannerkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/karun02525/QRScannerKit.git",
+      "state" : {
+        "revision" : "2be3bdc8ec763e689d6e7165442d29bc10a7a34b",
+        "version" : "1.0.4"
+      }
+    }
+  ],
+  "version" : 3
+}
